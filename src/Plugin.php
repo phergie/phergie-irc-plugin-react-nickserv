@@ -12,7 +12,7 @@ namespace Phergie\Irc\Plugin\React\NickServ;
 
 use Phergie\Irc\Bot\React\AbstractPlugin;
 use Phergie\Irc\Bot\React\EventQueueInterface as Queue;
-use Phergie\Irc\Event\EventInterface as Event;
+use Phergie\Irc\Event\UserEventInterface as Event;
 
 /**
  * Plugin for interacting with the NickServ agent to authenticate the bot's
@@ -35,15 +35,7 @@ class Plugin extends AbstractPlugin
      *
      * @var string
      */
-    protected $botNick;
-
-    /**
-     * PCRE-compatible regular expression for detecting a message from NickServ
-     * to trigger identification
-     *
-     * @var string
-     */
-    protected $identityPattern;
+    protected $botNick = 'NickServ';
 
     /**
      * Accepts plugin configuration.
@@ -53,19 +45,11 @@ class Plugin extends AbstractPlugin
      * password - required password used to authenticate the bot's identity to
      * the NickServ agent
      *
-     * botNick - optional name of the NickServ agent, defaults to 'NickServ'
-     *
-     * identityPattern - optional PCRE-compatible regular expression for
-     * detecting a message from NickServ to trigger identification, defaults to
-     * '/This nickname is registered\\./'
-     *
      * @param array $config
      */
     public function __construct(array $config = array())
     {
         $this->password = $this->getPassword($config);
-        $this->botNick = $this->getBotNick($config);
-        $this->identityPattern = $this->getIdentityPattern($config);
     }
 
     /**
@@ -104,7 +88,8 @@ class Plugin extends AbstractPlugin
 
         // Authenticate the bot's identity for authentication requests
         $nick = $event->getConnection()->getNickname();
-        if (preg_match($this->identityPattern, $message)) {
+        $pattern = '/This nickname is registered\\./';
+        if (preg_match($pattern, $message)) {
             $message = 'IDENTIFY ' . $nick . ' ' . $this->password;
             return $queue->ircPrivmsg($this->botNick, $message);
         }
@@ -179,48 +164,5 @@ class Plugin extends AbstractPlugin
             );
         }
         return $config['password'];
-    }
-
-    /**
-     * Extracts the name of the NickServ agent from configuration.
-     *
-     * @param array $config
-     * @return string
-     * @throws \DomainException botNick is specified, but not a string
-     */
-    protected function getBotNick(array $config)
-    {
-        $botNick = 'NickServ';
-        if (!empty($config['botNick'])) {
-            if (!is_string($config['botNick'])) {
-                throw new \DomainException(
-                    'botNick must be a non-empty string'
-                );
-            }
-            $botNick = $config['botNick'];
-        }
-        return $botNick;
-    }
-
-    /**
-     * Extracts a regular expression used to trigger identification from
-     * configuration.
-     *
-     * @param array $config
-     * @return string
-     * @throws \DomainException identityPattern is specified, but not a string
-     */
-    protected function getIdentityPattern(array $config)
-    {
-        $identityPattern = '/This nickname is registered\\./';
-        if (!empty($config['identityPattern'])) {
-            if (!is_string($config['identityPattern'])) {
-                throw new \DomainException(
-                    'identityPattern must be a non-empty string'
-                );
-            }
-            $identityPattern = $config['identityPattern'];
-        }
-        return $identityPattern;
     }
 }
