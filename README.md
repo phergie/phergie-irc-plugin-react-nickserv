@@ -24,7 +24,8 @@ See Phergie documentation for more information on
 ```php
 new \Phergie\Irc\Plugin\React\NickServ\Plugin(array(
 
-
+    // Required: password used to authenticate with NickServ
+    'password' => 'YOUR-NICKSERV-PASSWORD-HERE',
 
 ))
 ```
