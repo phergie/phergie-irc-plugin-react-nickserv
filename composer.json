@@ -1,0 +1,25 @@
+{
+    "name": "phergie/phergie-irc-plugin-react-nickserv",
+    "description": "Phergie plugin for interacting with the NickServ agent to authenticate the bot's identity",
+    "keywords": [ "irc", "bot", "react", "plugin" ],
+    "license": "BSD-2-Clause",
+    "support": {
+        "email": "team@phergie.org",
+        "irc": "irc://irc.freenode.net/phergie",
+        "issues": "https://github.com/phergie/phergie-irc-plugin-react-nickserv/issues",
+        "source": "https://github.com/phergie/phergie-irc-plugin-react-nickserv"
+    },
+    "minimum-stability": "dev",
+    "require": {
+        "phergie/phergie-irc-bot-react": "dev-master"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "4.1.*",
+        "phake/phake": "2.0.0-beta2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Phergie\\Irc\\Plugin\\React\\NickServ\\": "src"
+        }
+    }
+}
