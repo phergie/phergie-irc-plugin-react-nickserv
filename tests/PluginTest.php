@@ -8,11 +8,12 @@
  * @package Phergie\Irc\Plugin\React\NickServ
  */
 
-namespace Phergie\Irc\Plugin\React\NickServ;
+namespace Phergie\Irc\Tests\Plugin\React\NickServ;
 
 use Phake;
 use Phergie\Irc\Event\UserEventInterface;
 use Phergie\Irc\Bot\React\EventQueueInterface;
+use Phergie\Irc\Plugin\React\NickServ\Plugin;
 
 /**
  * Tests for the Plugin class.
