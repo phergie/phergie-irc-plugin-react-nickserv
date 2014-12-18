@@ -13,6 +13,7 @@ namespace Phergie\Irc\Plugin\React\NickServ;
 use Phergie\Irc\Bot\React\AbstractPlugin;
 use Phergie\Irc\Bot\React\EventQueueInterface as Queue;
 use Phergie\Irc\Event\UserEventInterface as Event;
+use Phergie\Irc\Event\ServerEventInterface as ServerEvent;
 
 /**
  * Plugin for interacting with the NickServ agent to authenticate the bot's
@@ -137,7 +138,7 @@ class Plugin extends AbstractPlugin
      * @param \Phergie\Irc\Event\EventInterface $event
      * @param \Phergie\Irc\Bot\React\EventQueueInterface $queue
      */
-    public function handleNicknameInUse(Event $event, Queue $queue)
+    public function handleNicknameInUse(ServerEvent $event, Queue $queue)
     {
         // Change nicks so NickServ will allow further interaction
         $nick = $event->getConnection()->getNickname();
