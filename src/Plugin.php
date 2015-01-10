@@ -88,7 +88,7 @@ class Plugin extends AbstractPlugin
 
         // Authenticate the bot's identity for authentication requests
         $nick = $event->getConnection()->getNickname();
-        $pattern = '/This nickname is registered\\./';
+        $pattern = '/This nickname is registered/';
         if (preg_match($pattern, $message)) {
             $message = 'IDENTIFY ' . $nick . ' ' . $this->password;
             return $queue->ircPrivmsg($this->botNick, $message);
