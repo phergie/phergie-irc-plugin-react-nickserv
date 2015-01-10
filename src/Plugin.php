@@ -12,7 +12,8 @@ namespace Phergie\Irc\Plugin\React\NickServ;
 
 use Phergie\Irc\Bot\React\AbstractPlugin;
 use Phergie\Irc\Bot\React\EventQueueInterface as Queue;
-use Phergie\Irc\Event\UserEventInterface as Event;
+use Phergie\Irc\Event\UserEventInterface as UserEvent;
+use Phergie\Irc\Event\ServerEventInterface as ServerEvent;
 
 /**
  * Plugin for interacting with the NickServ agent to authenticate the bot's
@@ -73,10 +74,10 @@ class Plugin extends AbstractPlugin
      * Responds to authentication requests and notifications of ghost
      * connections being killed from NickServ.
      *
-     * @param \Phergie\Irc\Event\EventInterface $event
+     * @param \Phergie\Irc\Event\UserEventInterface $event
      * @param \Phergie\Irc\Bot\React\EventQueueInterface $queue
      */
-    public function handleNotice(Event $event, Queue $queue)
+    public function handleNotice(UserEvent $event, Queue $queue)
     {
         // Ignore notices that aren't from the NickServ agent
         if (strcasecmp($event->getNick(), $this->botNick) !== 0) {
@@ -104,10 +105,10 @@ class Plugin extends AbstractPlugin
     /**
      * Reclaims the bot's nick if the user using it quits.
      *
-     * @param \Phergie\Irc\Event\EventInterface $event
+     * @param \Phergie\Irc\Event\UserEventInterface $event
      * @param \Phergie\Irc\Bot\React\EventQueueInterface $queue
      */
-    public function handleQuit(Event $event, Queue $queue)
+    public function handleQuit(UserEvent $event, Queue $queue)
     {
         $nick = $event->getConnection()->getNickname();
         if (strcasecmp($nick, $event->getNick()) === 0) {
@@ -119,10 +120,10 @@ class Plugin extends AbstractPlugin
      * Changes the nick associated with the bot in local memory when a change
      * to it is successfully registed with the server.
      *
-     * @param \Phergie\Irc\Event\EventInterface $event
+     * @param \Phergie\Irc\Event\UserEventInterface $event
      * @param \Phergie\Irc\Bot\React\EventQueueInterface $queue
      */
-    public function handleNick(Event $event, Queue $queue)
+    public function handleNick(UserEvent $event, Queue $queue)
     {
         $connection = $event->getConnection();
         if (strcasecmp($event->getNick(), $connection->getNickname()) === 0) {
@@ -134,10 +135,10 @@ class Plugin extends AbstractPlugin
     /**
      * Kills ghost connections. 
      *
-     * @param \Phergie\Irc\Event\EventInterface $event
+     * @param \Phergie\Irc\Event\ServerEventInterface $event
      * @param \Phergie\Irc\Bot\React\EventQueueInterface $queue
      */
-    public function handleNicknameInUse(Event $event, Queue $queue)
+    public function handleNicknameInUse(ServerEvent $event, Queue $queue)
     {
         // Change nicks so NickServ will allow further interaction
         $nick = $event->getConnection()->getNickname();

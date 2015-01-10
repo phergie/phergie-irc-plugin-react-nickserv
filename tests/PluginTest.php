@@ -12,6 +12,7 @@ namespace Phergie\Irc\Tests\Plugin\React\NickServ;
 
 use Phake;
 use Phergie\Irc\Event\UserEventInterface;
+use Phergie\Irc\Event\ServerEventInterface;
 use Phergie\Irc\Bot\React\EventQueueInterface;
 use Phergie\Irc\Plugin\React\NickServ\Plugin;
 
@@ -31,9 +32,9 @@ class PluginTest extends \PHPUnit_Framework_TestCase
     protected $plugin;
 
     /**
-     * Mock event
+     * Mock user event
      *
-     * @var \Phergie\Irc\Event\EventInterface
+     * @var \Phergie\Irc\Event\UserEventInterface
      */
     protected $event;
 
@@ -58,7 +59,7 @@ class PluginTest extends \PHPUnit_Framework_TestCase
     {
         $this->plugin = new Plugin(array('password' => 'password'));
         $this->connection = $this->getMockConnection();
-        $this->event = $this->getMockEvent();
+        $this->event = $this->getMockUserEvent();
         Phake::when($this->event)->getConnection()->thenReturn($this->connection);
         $this->queue = $this->getMockQueue();
     }
@@ -150,7 +151,9 @@ class PluginTest extends \PHPUnit_Framework_TestCase
      */
     public function testHandleNicknameInUse()
     {
-        $this->plugin->handleNicknameInUse($this->event, $this->queue);
+        $event = Phake::mock('\Phergie\Irc\Event\ServerEventInterface');
+        Phake::when($event)->getConnection()->thenReturn($this->connection);
+        $this->plugin->handleNicknameInUse($event, $this->queue);
         Phake::inOrder(
             Phake::verify($this->queue)->ircNick('Phergie_'),
             Phake::verify($this->queue)->ircPrivmsg('NickServ', 'GHOST Phergie password')
@@ -205,7 +208,7 @@ class PluginTest extends \PHPUnit_Framework_TestCase
      *
      * @return \Phergie\Irc\Event\UserEventInterface
      */
-    protected function getMockEvent()
+    protected function getMockUserEvent()
     {
         $event = Phake::mock('\Phergie\Irc\Event\UserEventInterface');
         Phake::when($event)->getNick()->thenReturn('NickServ');
