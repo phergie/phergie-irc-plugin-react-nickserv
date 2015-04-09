@@ -53,6 +53,13 @@ class PluginTest extends \PHPUnit_Framework_TestCase
     protected $connection;
 
     /**
+     * Mock connection
+     *
+     * @var \Evenement\EventEmitterInterface
+     */
+    protected $emitter;
+
+    /**
      * Instantiates the class under test.
      */
     protected function setUp()
@@ -62,6 +69,8 @@ class PluginTest extends \PHPUnit_Framework_TestCase
         $this->event = $this->getMockUserEvent();
         Phake::when($this->event)->getConnection()->thenReturn($this->connection);
         $this->queue = $this->getMockQueue();
+        $this->emitter = $this->getMockEventEmitter();
+        $this->plugin->setEventEmitter($this->emitter);
     }
 
     /**
@@ -131,6 +140,7 @@ class PluginTest extends \PHPUnit_Framework_TestCase
     public function testHandleNickWithIrrelevantEvent()
     {
         Phake::verifyNoFurtherInteraction($this->queue);
+        Phake::verifyNoFurtherInteraction($this->emitter);
         $this->plugin->handleNick($this->event, $this->queue);
     }
 
@@ -144,6 +154,7 @@ class PluginTest extends \PHPUnit_Framework_TestCase
         Phake::when($this->event)->getParams()->thenReturn(array('nickname' => 'Phergie'));
         $this->plugin->handleNick($this->event, $this->queue);
         Phake::verify($this->connection)->setNickname('Phergie');
+        Phake::verify($this->emitter)->emit('nickserv.nick', [$this->connection]);
     }
 
     /**
@@ -235,5 +246,15 @@ class PluginTest extends \PHPUnit_Framework_TestCase
         $connection = Phake::mock('\Phergie\Irc\ConnectionInterface');
         Phake::when($connection)->getNickname()->thenReturn('Phergie');
         return $connection;
+    }
+
+    /**
+     * Returns a mock event emitter.
+     *
+     * @return \Evenement\EventEmitterInterface
+     */
+    protected function getMockEventEmitter()
+    {
+        return Phake::mock('Evenement\EventEmitterInterface');
     }
 }
