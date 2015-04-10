@@ -118,7 +118,7 @@ class Plugin extends AbstractPlugin
 
     /**
      * Changes the nick associated with the bot in local memory when a change
-     * to it is successfully registed with the server.
+     * to it is successfully registered with the server.
      *
      * @param \Phergie\Irc\Event\UserEventInterface $event
      * @param \Phergie\Irc\Bot\React\EventQueueInterface $queue
@@ -129,11 +129,12 @@ class Plugin extends AbstractPlugin
         if (strcasecmp($event->getNick(), $connection->getNickname()) === 0) {
             $params = $event->getParams();
             $connection->setNickname($params['nickname']);
+            $this->getEventEmitter()->emit('nickserv.nick', [$connection]);
         }
     }
 
     /**
-     * Kills ghost connections. 
+     * Kills ghost connections.
      *
      * @param \Phergie\Irc\Event\ServerEventInterface $event
      * @param \Phergie\Irc\Bot\React\EventQueueInterface $queue
