@@ -88,9 +88,19 @@ class PluginTest extends \PHPUnit_Framework_TestCase
      */
     public function testHandleNoticeWithIrrelevantNoticeFromNickServ()
     {
-        Phake::when($this->event)->getParams()->thenReturn(array('text' => 'You are now identified for Phergie'));
+        Phake::when($this->event)->getParams()->thenReturn(['text' => 'You are already logged in as Phergie']);
         Phake::verifyNoFurtherInteraction($this->queue);
         $this->plugin->handleNotice($this->event, $this->queue);
+    }
+
+    /**
+     * Tests that identity confirmation notices from the NickServ emit an event.
+     */
+    public function testHandleNoticeWithIdentityConfirmation()
+    {
+        Phake::when($this->event)->getParams()->thenReturn(['text' => 'You are now identified for Phergie']);
+        $this->plugin->handleNotice($this->event, $this->queue);
+        Phake::verify($this->emitter)->emit('nickserv.confirmed', [$this->connection]);
     }
 
     /**
@@ -140,7 +150,6 @@ class PluginTest extends \PHPUnit_Framework_TestCase
     public function testHandleNickWithIrrelevantEvent()
     {
         Phake::verifyNoFurtherInteraction($this->queue);
-        Phake::verifyNoFurtherInteraction($this->emitter);
         $this->plugin->handleNick($this->event, $this->queue);
     }
 
@@ -154,7 +163,6 @@ class PluginTest extends \PHPUnit_Framework_TestCase
         Phake::when($this->event)->getParams()->thenReturn(array('nickname' => 'Phergie'));
         $this->plugin->handleNick($this->event, $this->queue);
         Phake::verify($this->connection)->setNickname('Phergie');
-        Phake::verify($this->emitter)->emit('nickserv.nick', [$this->connection]);
     }
 
     /**
