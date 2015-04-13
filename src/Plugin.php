@@ -100,6 +100,12 @@ class Plugin extends AbstractPlugin
         if (preg_match($pattern, $message)) {
             return $queue->ircNick($nick);
         }
+
+        // Emit event when user's identity has been confirmed
+        $pattern = '/You are now identified/';
+        if (preg_match($pattern, $message)) {
+            $this->getEventEmitter()->emit('nickserv.confirmed', [$event->getConnection()]);
+        }
     }
 
     /**
@@ -129,7 +135,6 @@ class Plugin extends AbstractPlugin
         if (strcasecmp($event->getNick(), $connection->getNickname()) === 0) {
             $params = $event->getParams();
             $connection->setNickname($params['nickname']);
-            $this->getEventEmitter()->emit('nickserv.nick', [$connection]);
         }
     }
 
