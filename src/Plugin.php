@@ -60,6 +60,20 @@ class Plugin extends AbstractPlugin
     protected $botNick = 'NickServ';
 
     /**
+     * Ghosted nick
+     *
+     * @var string|null
+     */
+    protected $ghostNick;
+
+    /**
+     * Whether to attempt ghosting
+     *
+     * @var bool
+     */
+    protected $ghostEnabled = false;
+
+    /**
      * Accepts plugin configuration.
      *
      * Supported keys:
@@ -68,6 +82,10 @@ class Plugin extends AbstractPlugin
      * the NickServ agent
      *
      * botnick - name of the NickServ service (optional)
+     *
+     * ghost - attempt to ghost the original nick if it is in use (optional)
+     *   NOTE: you will need to use a plugin like AltNick to provide an alternative nickname
+     *   during the registration phase, or the server will close your connection.
      *
      * identifypattern - custom regex pattern matching the text of the NOTICE received by NickServ
      * requesting identification (optional)
@@ -85,6 +103,9 @@ class Plugin extends AbstractPlugin
         $this->password = $this->getConfigOption($config, 'password');
         if (isset($config['botnick'])) {
             $this->botNick = $this->getConfigOption($config, 'botnick');
+        }
+        if (!empty($config['ghost'])) {
+            $this->ghostEnabled = true;
         }
         if (isset($config['identifypattern'])) {
             $this->identifyPattern = $this->getConfigOption($config, 'identifypattern');
@@ -108,9 +129,10 @@ class Plugin extends AbstractPlugin
     {
         return array(
             'irc.received.notice' => 'handleNotice',
-            'irc.received.quit' => 'handleQuit',
             'irc.received.nick' => 'handleNick',
             'irc.received.err_nicknameinuse' => 'handleNicknameInUse',
+            'irc.received.rpl_endofmotd' => 'handleGhost',
+            'irc.received.err_nomotd' => 'handleGhost',
         );
     }
 
@@ -134,34 +156,19 @@ class Plugin extends AbstractPlugin
 
         // Authenticate the bot's identity for authentication requests
         if (preg_match($this->identifyPattern, $message)) {
-            $message = 'IDENTIFY ' . $connection->getNickname() . ' ' . $this->password;
-            return $queue->ircPrivmsg($this->botNick, $message);
+            return $queue->ircPrivmsg($this->botNick, 'IDENTIFY ' . $connection->getNickname() . ' ' . $this->password);
         }
 
-        // Switch nicks for notifications of ghost connections being killed
-        $pattern = '/^.*' . preg_quote($nick) . '.* has been ghosted/';
-        if (preg_match($pattern, $message)) {
-            return $queue->ircNick($nick);
+        // Emit an event on successful authentication
+        if (preg_match($this->loginPattern, $message)) {
+            return $this->getEventEmitter()->emit('nickserv.identified', [$connection, $queue]);
         }
 
-        // Emit event when user's identity has been confirmed
-        $pattern = '/You are now identified/';
-        if (preg_match($pattern, $message)) {
-            $this->getEventEmitter()->emit('nickserv.confirmed', [$event->getConnection()]);
-        }
-    }
-
-    /**
-     * Reclaims the bot's nick if the user using it quits.
-     *
-     * @param \Phergie\Irc\Event\UserEventInterface $event
-     * @param \Phergie\Irc\Bot\React\EventQueueInterface $queue
-     */
-    public function handleQuit(UserEvent $event, Queue $queue)
-    {
-        $nick = $event->getConnection()->getNickname();
-        if (strcasecmp($nick, $event->getNick()) === 0) {
-            return $queue->ircNick($nick);
+        // Reclaim primary nick on ghost confirmation
+        if ($this->ghostNick !== null && preg_match($this->ghostPattern, $message)) {
+            $queue->ircNick($this->ghostNick);
+            $this->ghostNick = null;
+            return;
         }
     }
 
@@ -182,20 +189,37 @@ class Plugin extends AbstractPlugin
     }
 
     /**
-     * Kills ghost connections.
+     * Kick-starts the ghost process.
      *
      * @param \Phergie\Irc\Event\ServerEventInterface $event
      * @param \Phergie\Irc\Bot\React\EventQueueInterface $queue
      */
     public function handleNicknameInUse(ServerEvent $event, Queue $queue)
     {
-        // Change nicks so NickServ will allow further interaction
-        $nick = $event->getConnection()->getNickname();
-        $queue->ircNick($nick . '_');
+        // Don't listen if ghost isn't enabled, or this isn't the first nickname-in-use error
+        if (!$this->ghostEnabled || $this->ghostNick !== null) {
+            return;
+        }
+
+        // Save the nick, so that we can send a ghost request once registration is complete
+        $params = $event->getParams();
+        $this->ghostNick = $params[1];
+    }
+
+    /**
+     * Completes the ghost process.
+     *
+     * @param \Phergie\Irc\Event\ServerEventInterface $event
+     * @param \Phergie\Irc\Bot\React\EventQueueInterface $queue
+     */
+    public function handleGhost(ServerEvent $event, Queue $queue)
+    {
+        if ($this->ghostNick === null) {
+            return;
+        }
 
         // Attempt to kill the ghost connection
-        $message = 'GHOST ' . $nick . ' ' . $this->password;
-        $queue->ircPrivmsg($this->botNick, $message);
+        $queue->ircPrivmsg($this->botNick, 'GHOST ' . $this->ghostNick . ' ' . $this->password);
     }
 
     /**

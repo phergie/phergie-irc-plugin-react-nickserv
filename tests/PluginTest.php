@@ -64,7 +64,7 @@ class PluginTest extends \PHPUnit_Framework_TestCase
      */
     protected function setUp()
     {
-        $this->plugin = new Plugin(array('password' => 'password'));
+        $this->plugin = new Plugin(array('password' => 'password', 'ghost' => true));
         $this->connection = $this->getMockConnection();
         $this->event = $this->getMockUserEvent();
         Phake::when($this->event)->getConnection()->thenReturn($this->connection);
@@ -100,7 +100,7 @@ class PluginTest extends \PHPUnit_Framework_TestCase
     {
         Phake::when($this->event)->getParams()->thenReturn(['text' => 'You are now identified for Phergie']);
         $this->plugin->handleNotice($this->event, $this->queue);
-        Phake::verify($this->emitter)->emit('nickserv.confirmed', [$this->connection]);
+        Phake::verify($this->emitter)->emit('nickserv.identified', [$this->connection, $this->queue]);
     }
 
     /**
@@ -112,36 +112,6 @@ class PluginTest extends \PHPUnit_Framework_TestCase
         Phake::when($this->event)->getParams()->thenReturn(array('text' => $text));
         $this->plugin->handleNotice($this->event, $this->queue);
         Phake::verify($this->queue)->ircPrivmsg('NickServ', 'IDENTIFY Phergie password');
-    }
-
-    /**
-     * Tests that ghost connection kills are handled.
-     */
-    public function testHandleNoticeWithGhostKillNotification()
-    {
-        $text = 'Phergie has been ghosted.';
-        Phake::when($this->event)->getParams()->thenReturn(array('text' => $text));
-        $this->plugin->handleNotice($this->event, $this->queue);
-        Phake::verify($this->queue)->ircNick('Phergie');
-    }
-
-    /**
-     * Tests that irrelevant QUIT events are ignored.
-     */
-    public function testHandleQuitWithIrrelevantEvent()
-    {
-        Phake::verifyNoFurtherInteraction($this->queue);
-        $this->plugin->handleQuit($this->event, $this->queue);
-    }
-
-    /**
-     * Tests that the bot reclaims its nick if a user using it quits.
-     */
-    public function testHandleQuitWithRelevantEvent()
-    {
-        Phake::when($this->event)->getNick()->thenReturn('Phergie');
-        $this->plugin->handleQuit($this->event, $this->queue);
-        Phake::verify($this->queue)->ircNick('Phergie');
     }
 
     /**
@@ -166,17 +136,39 @@ class PluginTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * Tests that the bot attempts to kill ghost connections.
+     * Tests that the plugin processes the ghost sequence correctly.
      */
-    public function testHandleNicknameInUse()
+    public function testHandleGhost()
     {
         $event = Phake::mock('\Phergie\Irc\Event\ServerEventInterface');
         Phake::when($event)->getConnection()->thenReturn($this->connection);
+
+        $text = 'Phergie has been ghosted.';
+        Phake::when($this->event)->getParams()->thenReturn(array('text' => $text));
+
+        // Verify no-op when no ghost nick is set yet
+        $this->plugin->handleGhost($event, $this->queue);
+        Phake::verifyNoInteraction($this->queue);
+
+        $this->plugin->handleNotice($this->event, $this->queue);
+        Phake::verifyNoInteraction($this->queue);
+
+        // Verify setting of ghost nick if nickname in use
+        Phake::when($event)->getParams()->thenReturn([1 => 'Phergie', 2 => 'Nickname is already in use']);
         $this->plugin->handleNicknameInUse($event, $this->queue);
-        Phake::inOrder(
-            Phake::verify($this->queue)->ircNick('Phergie_'),
-            Phake::verify($this->queue)->ircPrivmsg('NickServ', 'GHOST Phergie password')
-        );
+        $this->assertEquals('Phergie', $this->getInternalGhostNick());
+
+        // Verify ghost nick not changed if additional nicknames are also in use
+        Phake::when($event)->getParams()->thenReturn([1 => 'SomeOtherNick', 2 => 'Nickname is already in use']);
+        $this->plugin->handleNicknameInUse($event, $this->queue);
+        $this->assertEquals('Phergie', $this->getInternalGhostNick());
+
+        // Verify ghost execution
+        $this->plugin->handleGhost($event, $this->queue);
+        Phake::verify($this->queue)->ircPrivmsg('NickServ', 'GHOST Phergie password');
+
+        $this->plugin->handleNotice($this->event, $this->queue);
+        Phake::verify($this->queue)->ircNick('Phergie');
     }
 
     /**
@@ -264,5 +256,18 @@ class PluginTest extends \PHPUnit_Framework_TestCase
     protected function getMockEventEmitter()
     {
         return Phake::mock('Evenement\EventEmitterInterface');
+    }
+
+    /**
+     * Uses reflection to grab the internal ghost nick variable.
+     *
+     * @return string|null
+     */
+    protected function getInternalGhostNick()
+    {
+        $reflector = new \ReflectionObject($this->plugin);
+        $property = $reflector->getProperty('ghostNick');
+        $property->setAccessible(true);
+        return $property->getValue($this->plugin);
     }
 }
