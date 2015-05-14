@@ -32,6 +32,27 @@ class Plugin extends AbstractPlugin
     protected $password;
 
     /**
+     * Regex pattern matching a request for identification
+     *
+     * @var string
+     */
+    protected $identifyPattern = '/This nickname is registered/';
+
+    /**
+     * Regex pattern matching a successful login notice
+     *
+     * @var string
+     */
+    protected $loginPattern = '/You are now identified/';
+
+    /**
+     * Regex pattern matching a ghosted nick notice
+     *
+     * @var string
+     */
+    protected $ghostPattern = '/has been ghosted/';
+
+    /**
      * Name of the NickServ agent
      *
      * @var string
@@ -46,11 +67,34 @@ class Plugin extends AbstractPlugin
      * password - required password used to authenticate the bot's identity to
      * the NickServ agent
      *
+     * botnick - name of the NickServ service (optional)
+     *
+     * identifypattern - custom regex pattern matching the text of the NOTICE received by NickServ
+     * requesting identification (optional)
+     *
+     * loggedinpattern - custom regex pattern matching the text of the NOTICE received by NickServ
+     * upon successful identification (optional)
+     *
+     * ghostpattern - custom regex pattern matching the text of the NOTICE received by NickServ
+     * upon ghosting a nick (optional)
+     *
      * @param array $config
      */
     public function __construct(array $config = array())
     {
-        $this->password = $this->getPassword($config);
+        $this->password = $this->getConfigOption($config, 'password');
+        if (isset($config['botnick'])) {
+            $this->botNick = $this->getConfigOption($config, 'botnick');
+        }
+        if (isset($config['identifypattern'])) {
+            $this->identifyPattern = $this->getConfigOption($config, 'identifypattern');
+        }
+        if (isset($config['loggedinpattern'])) {
+            $this->loginPattern = $this->getConfigOption($config, 'loggedinpattern');
+        }
+        if (isset($config['ghostpattern'])) {
+            $this->ghostPattern = $this->getConfigOption($config, 'ghostpattern');
+        }
     }
 
     /**
@@ -84,14 +128,13 @@ class Plugin extends AbstractPlugin
             return;
         }
 
+        $connection = $event->getConnection();
         $params = $event->getParams();
         $message = $params['text'];
 
         // Authenticate the bot's identity for authentication requests
-        $nick = $event->getConnection()->getNickname();
-        $pattern = '/This nickname is registered/';
-        if (preg_match($pattern, $message)) {
-            $message = 'IDENTIFY ' . $nick . ' ' . $this->password;
+        if (preg_match($this->identifyPattern, $message)) {
+            $message = 'IDENTIFY ' . $connection->getNickname() . ' ' . $this->password;
             return $queue->ircPrivmsg($this->botNick, $message);
         }
 
@@ -156,20 +199,20 @@ class Plugin extends AbstractPlugin
     }
 
     /**
-     * Extracts the password used to authenticate with the NickServ agent from
-     * configuration.
+     * Extracts a string from the config options map.
      *
      * @param array $config
+     * @param string $key
      * @return string
-     * @throws \DomainException password is unspecified or not a string
+     * @throws \DomainException if password is unspecified or not a string
      */
-    protected function getPassword(array $config)
+    protected function getConfigOption(array $config, $key)
     {
-        if (empty($config['password']) || !is_string($config['password'])) {
+        if (empty($config[$key]) || !is_string($config[$key])) {
             throw new \DomainException(
-                'password must be a non-empty string'
+                "$key must be a non-empty string"
             );
         }
-        return $config['password'];
+        return $config[$key];
     }
 }
