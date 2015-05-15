@@ -27,8 +27,32 @@ new \Phergie\Irc\Plugin\React\NickServ\Plugin(array(
     // Required: password used to authenticate with NickServ
     'password' => 'YOUR-NICKSERV-PASSWORD-HERE',
 
+    /* Everything else is optional! */
+
+    // NickServ's nickname
+    'botnick' => 'NickServ',
+
+    // Whether or not to attempt to "ghost" the primary nick if it's in use
+    'ghost' => false,
+
+    // Regex pattern matching a NickServ notice asking for identification
+    'identifypattern' => '/This nickname is registered/',
+
+    // Regex pattern matching a NickServ notice indicating a successful login
+    'loggedinpattern' => '/You are now identified/',
+
+    // Regex pattern matching a NickServ notice indicating the nickname has been ghosted
+    'ghostpattern' => '/has been ghosted/',
 ))
 ```
+
+## Events
+
+This plugin emits the following event:
+
+Event name | Callback parameters | Emitted on
+-----------|---------------------|-----------
+`nickserv.identified` | <ul><li>`\Phergie\Irc\ConnectionInterface $connection`</li><li>`\Phergie\Irc\Bot\React\EventQueueInterface $queue`</li></ul> | Successful NickServ login
 
 ## Tests
 
