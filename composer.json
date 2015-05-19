@@ -17,6 +17,9 @@
         "phpunit/phpunit": "~4.6",
         "phake/phake": "~2"
     },
+    "suggest": {
+        "pschwisow/phergie-irc-plugin-react-altnick": "Provides alternative nicks if the primary nick is in use; required for ghost feature"
+    },
     "autoload": {
         "psr-4": {
             "Phergie\\Irc\\Plugin\\React\\NickServ\\": "src"
