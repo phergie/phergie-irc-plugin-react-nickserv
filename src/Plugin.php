@@ -32,11 +32,46 @@ class Plugin extends AbstractPlugin
     protected $password;
 
     /**
+     * Regex pattern matching a request for identification
+     *
+     * @var string
+     */
+    protected $identifyPattern = '/This nickname is registered/';
+
+    /**
+     * Regex pattern matching a successful login notice
+     *
+     * @var string
+     */
+    protected $loginPattern = '/You are now identified/';
+
+    /**
+     * Regex pattern matching a ghosted nick notice
+     *
+     * @var string
+     */
+    protected $ghostPattern = '/has been ghosted/';
+
+    /**
      * Name of the NickServ agent
      *
      * @var string
      */
     protected $botNick = 'NickServ';
+
+    /**
+     * Ghosted nick
+     *
+     * @var string|null
+     */
+    protected $ghostNick;
+
+    /**
+     * Whether to attempt ghosting
+     *
+     * @var bool
+     */
+    protected $ghostEnabled = false;
 
     /**
      * Accepts plugin configuration.
@@ -46,11 +81,41 @@ class Plugin extends AbstractPlugin
      * password - required password used to authenticate the bot's identity to
      * the NickServ agent
      *
+     * botnick - name of the NickServ service (optional)
+     *
+     * ghost - attempt to ghost the original nick if it is in use (optional)
+     *   NOTE: you will need to use a plugin like AltNick to provide an alternative nickname
+     *   during the registration phase, or the server will close your connection.
+     *
+     * identifypattern - custom regex pattern matching the text of the NOTICE received by NickServ
+     * requesting identification (optional)
+     *
+     * loggedinpattern - custom regex pattern matching the text of the NOTICE received by NickServ
+     * upon successful identification (optional)
+     *
+     * ghostpattern - custom regex pattern matching the text of the NOTICE received by NickServ
+     * upon ghosting a nick (optional)
+     *
      * @param array $config
      */
     public function __construct(array $config = array())
     {
-        $this->password = $this->getPassword($config);
+        $this->password = $this->getConfigOption($config, 'password');
+        if (isset($config['botnick'])) {
+            $this->botNick = $this->getConfigOption($config, 'botnick');
+        }
+        if (!empty($config['ghost'])) {
+            $this->ghostEnabled = true;
+        }
+        if (isset($config['identifypattern'])) {
+            $this->identifyPattern = $this->getConfigOption($config, 'identifypattern');
+        }
+        if (isset($config['loggedinpattern'])) {
+            $this->loginPattern = $this->getConfigOption($config, 'loggedinpattern');
+        }
+        if (isset($config['ghostpattern'])) {
+            $this->ghostPattern = $this->getConfigOption($config, 'ghostpattern');
+        }
     }
 
     /**
@@ -64,9 +129,10 @@ class Plugin extends AbstractPlugin
     {
         return array(
             'irc.received.notice' => 'handleNotice',
-            'irc.received.quit' => 'handleQuit',
             'irc.received.nick' => 'handleNick',
             'irc.received.err_nicknameinuse' => 'handleNicknameInUse',
+            'irc.received.rpl_endofmotd' => 'handleGhost',
+            'irc.received.err_nomotd' => 'handleGhost',
         );
     }
 
@@ -84,41 +150,25 @@ class Plugin extends AbstractPlugin
             return;
         }
 
+        $connection = $event->getConnection();
         $params = $event->getParams();
         $message = $params['text'];
 
         // Authenticate the bot's identity for authentication requests
-        $nick = $event->getConnection()->getNickname();
-        $pattern = '/This nickname is registered/';
-        if (preg_match($pattern, $message)) {
-            $message = 'IDENTIFY ' . $nick . ' ' . $this->password;
-            return $queue->ircPrivmsg($this->botNick, $message);
+        if (preg_match($this->identifyPattern, $message)) {
+            return $queue->ircPrivmsg($this->botNick, 'IDENTIFY ' . $connection->getNickname() . ' ' . $this->password);
         }
 
-        // Switch nicks for notifications of ghost connections being killed
-        $pattern = '/^.*' . preg_quote($nick) . '.* has been ghosted/';
-        if (preg_match($pattern, $message)) {
-            return $queue->ircNick($nick);
+        // Emit an event on successful authentication
+        if (preg_match($this->loginPattern, $message)) {
+            return $this->getEventEmitter()->emit('nickserv.identified', [$connection, $queue]);
         }
 
-        // Emit event when user's identity has been confirmed
-        $pattern = '/You are now identified/';
-        if (preg_match($pattern, $message)) {
-            $this->getEventEmitter()->emit('nickserv.confirmed', [$event->getConnection()]);
-        }
-    }
-
-    /**
-     * Reclaims the bot's nick if the user using it quits.
-     *
-     * @param \Phergie\Irc\Event\UserEventInterface $event
-     * @param \Phergie\Irc\Bot\React\EventQueueInterface $queue
-     */
-    public function handleQuit(UserEvent $event, Queue $queue)
-    {
-        $nick = $event->getConnection()->getNickname();
-        if (strcasecmp($nick, $event->getNick()) === 0) {
-            return $queue->ircNick($nick);
+        // Reclaim primary nick on ghost confirmation
+        if ($this->ghostNick !== null && preg_match($this->ghostPattern, $message)) {
+            $queue->ircNick($this->ghostNick);
+            $this->ghostNick = null;
+            return;
         }
     }
 
@@ -139,37 +189,54 @@ class Plugin extends AbstractPlugin
     }
 
     /**
-     * Kills ghost connections.
+     * Kick-starts the ghost process.
      *
      * @param \Phergie\Irc\Event\ServerEventInterface $event
      * @param \Phergie\Irc\Bot\React\EventQueueInterface $queue
      */
     public function handleNicknameInUse(ServerEvent $event, Queue $queue)
     {
-        // Change nicks so NickServ will allow further interaction
-        $nick = $event->getConnection()->getNickname();
-        $queue->ircNick($nick . '_');
+        // Don't listen if ghost isn't enabled, or this isn't the first nickname-in-use error
+        if (!$this->ghostEnabled || $this->ghostNick !== null) {
+            return;
+        }
 
-        // Attempt to kill the ghost connection
-        $message = 'GHOST ' . $nick . ' ' . $this->password;
-        $queue->ircPrivmsg($this->botNick, $message);
+        // Save the nick, so that we can send a ghost request once registration is complete
+        $params = $event->getParams();
+        $this->ghostNick = $params[1];
     }
 
     /**
-     * Extracts the password used to authenticate with the NickServ agent from
-     * configuration.
+     * Completes the ghost process.
+     *
+     * @param \Phergie\Irc\Event\ServerEventInterface $event
+     * @param \Phergie\Irc\Bot\React\EventQueueInterface $queue
+     */
+    public function handleGhost(ServerEvent $event, Queue $queue)
+    {
+        if ($this->ghostNick === null) {
+            return;
+        }
+
+        // Attempt to kill the ghost connection
+        $queue->ircPrivmsg($this->botNick, 'GHOST ' . $this->ghostNick . ' ' . $this->password);
+    }
+
+    /**
+     * Extracts a string from the config options map.
      *
      * @param array $config
+     * @param string $key
      * @return string
-     * @throws \DomainException password is unspecified or not a string
+     * @throws \DomainException if password is unspecified or not a string
      */
-    protected function getPassword(array $config)
+    protected function getConfigOption(array $config, $key)
     {
-        if (empty($config['password']) || !is_string($config['password'])) {
+        if (empty($config[$key]) || !is_string($config[$key])) {
             throw new \DomainException(
-                'password must be a non-empty string'
+                "$key must be a non-empty string"
             );
         }
-        return $config['password'];
+        return $config[$key];
     }
 }

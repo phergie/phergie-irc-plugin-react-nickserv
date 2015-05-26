@@ -9,13 +9,16 @@
         "issues": "https://github.com/phergie/phergie-irc-plugin-react-nickserv/issues",
         "source": "https://github.com/phergie/phergie-irc-plugin-react-nickserv"
     },
-    "minimum-stability": "dev",
     "require": {
-        "phergie/phergie-irc-bot-react": "~1"
+        "phergie/phergie-irc-bot-react": "~1",
+        "phergie/phergie-irc-parser": "~1.6"
     },
     "require-dev": {
-        "phpunit/phpunit": "4.1.*",
-        "phake/phake": "2.0.0-beta2"
+        "phpunit/phpunit": "~4.6",
+        "phake/phake": "~2"
+    },
+    "suggest": {
+        "pschwisow/phergie-irc-plugin-react-altnick": "Provides alternative nicks if the primary nick is in use; required for ghost feature"
     },
     "autoload": {
         "psr-4": {
