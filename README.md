@@ -36,6 +36,10 @@ See Phergie documentation for more information on
         // Whether or not to attempt to "ghost" the primary nick if it's in use
         'ghost' => false,
 
+        // Custom identify command pattern.
+        // %nickname% and %password% will be replaced with the bot nick and NickServ password respectively.
+        'identifycommand' => 'IDENTIFY %nickname% %password%',
+
         // Regex pattern matching a NickServ notice asking for identification
         'identifypattern' => '/This nickname is registered/',
 
@@ -51,6 +55,15 @@ See Phergie documentation for more information on
         'nicks' => /* ... */
     )),
 )
+```
+
+### Identify command pattern
+
+The default identify command is `IDENTIFY %nickname% %password%` - this works by default on common IRC services.
+However, some networks may require a different identify command format. For example, networks like Rizon do not
+support the nickname as a parameter, so the correct configuration for such networks would be:
+```php
+    'identifycommand' => 'IDENTIFY %password%'
 ```
 
 ## Ghosting

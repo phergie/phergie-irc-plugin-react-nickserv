@@ -32,6 +32,17 @@ class Plugin extends AbstractPlugin
     protected $password;
 
     /**
+     * Identification command pattern.
+     *
+     * String patterns:
+     * - %nickname% - bot's current nickname
+     * - %password% - NickServ password
+     *
+     * @var string
+     */
+    protected $identifyCommand = 'IDENTIFY %nickname% %password%';
+
+    /**
      * Regex pattern matching a request for identification
      *
      * @var string
@@ -107,6 +118,9 @@ class Plugin extends AbstractPlugin
         if (!empty($config['ghost'])) {
             $this->ghostEnabled = true;
         }
+        if (isset($config['identifycommand'])) {
+            $this->identifyCommand = $this->getConfigOption($config, 'identifycommand');
+        }
         if (isset($config['identifypattern'])) {
             $this->identifyPattern = $this->getConfigOption($config, 'identifypattern');
         }
@@ -156,7 +170,12 @@ class Plugin extends AbstractPlugin
 
         // Authenticate the bot's identity for authentication requests
         if (preg_match($this->identifyPattern, $message)) {
-            return $queue->ircPrivmsg($this->botNick, 'IDENTIFY ' . $connection->getNickname() . ' ' . $this->password);
+            $command = str_replace(
+                array('%nickname%', '%password%'),
+                array($connection->getNickname(), $this->password),
+                $this->identifyCommand
+            );
+            return $queue->ircPrivmsg($this->botNick, $command);
         }
 
         // Emit an event on successful authentication
