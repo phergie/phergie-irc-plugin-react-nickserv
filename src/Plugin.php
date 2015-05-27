@@ -156,7 +156,7 @@ class Plugin extends AbstractPlugin
 
         // Authenticate the bot's identity for authentication requests
         if (preg_match($this->identifyPattern, $message)) {
-            return $queue->ircPrivmsg($this->botNick, 'IDENTIFY ' . $connection->getNickname() . ' ' . $this->password);
+            return $queue->ircPrivmsg($this->botNick, 'IDENTIFY ' . $this->password);
         }
 
         // Emit an event on successful authentication

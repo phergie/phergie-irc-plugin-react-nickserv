@@ -111,7 +111,7 @@ class PluginTest extends \PHPUnit_Framework_TestCase
         $text = 'This nickname is registered. Please choose a different nickname, or identify via /msg NickServ identify <password>.';
         Phake::when($this->event)->getParams()->thenReturn(array('text' => $text));
         $this->plugin->handleNotice($this->event, $this->queue);
-        Phake::verify($this->queue)->ircPrivmsg('NickServ', 'IDENTIFY Phergie password');
+        Phake::verify($this->queue)->ircPrivmsg('NickServ', 'IDENTIFY password');
     }
 
     /**
