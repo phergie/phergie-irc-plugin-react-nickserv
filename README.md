@@ -8,12 +8,8 @@
 
 The recommended method of installation is [through composer](http://getcomposer.org).
 
-```JSON
-{
-    "require": {
-        "phergie/phergie-irc-plugin-react-nickserv": "~2"
-    }
-}
+```
+composer require phergie/phergie-irc-plugin-react-nickserv
 ```
 
 See Phergie documentation for more information on
